@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import * as CodeMirror from 'codemirror';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -12,68 +13,25 @@ export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		let ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		let statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				let markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+        let cm = global.CodeMirror;
+        await this.loadSettings();
+        (cm as any).Vim.unmap('<Space>');
+        mkMapping("move-left", "<Space>h", moveLeft, cm);
+        mkMapping("move-right", "<Space>l", moveRight, cm);
+        mkMapping("move-up", "<Space>k", moveUp, cm);
+        mkMapping("move-down", "<Space>j", moveDown, cm);
+        mkMapping("close-window", "<Space>c", closeWindow, cm);
+        mkMapping("find-files", "<Space><Space>", quickSwitch, cm);
+        mkMapping("files", "-", files, cm);
+        mkMapping("graph", "<Space>g", graph, cm);
+        mkMapping("graph-local", "<Space>f", graphLocal, cm);
+        mkMapping("new-workspace", "<Space>q", () => withWorkspace(mkWorkspace), cm);
+        mkMapping("next-workspace", "<Space>o", () => withWorkspace(nextWorkspace), cm);
+        mkMapping("prev-workspace", "<Space>i", () =>withWorkspace(prevWorkspace), cm);
+        mkMapping("del-workspace", "<Space>Q", () => withWorkspace(delWorkspace), cm);
+        // todo: map escape
+        // - nohighlight
+        // - return to editor window
 	}
 
 	onunload() {
@@ -89,21 +47,6 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
 
 class SampleSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
@@ -132,4 +75,145 @@ class SampleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 	}
+}
+
+function moveOrSplit(toMove: string, toSplit: string, fixSplit: boolean) {
+    let old = (global as any).app.workspace.activeLeaf;
+    (global as any).app.commands.executeCommandById(toMove);
+    if (old != (global as any).app.workspace.activeLeaf) {
+        return;
+    }
+
+    (global as any).app.commands.executeCommandById(toSplit);
+    if (fixSplit) {
+        (global as any).app.commands.executeCommandById(toMove);
+    }
+}
+
+let ver = "workspace:split-vertical"
+let hor = "workspace:split-horizontal"
+let left = "editor:focus-left"
+let right = "editor:focus-right"
+let up = "editor:focus-top"
+let down = "editor:focus-bottom"
+
+function mkMapping(name: string, key: string, action:any, cm:any) {
+    cm.Vim.defineAction(name, action);
+    cm.Vim.mapCommand(key, "action", name, {}, {"context": "normal", "isEdit": false});
+}
+
+function moveRight() {
+    moveOrSplit(right, ver, true);
+}
+function moveLeft() {
+    moveOrSplit(left, ver, false);
+}
+function moveDown() {
+    moveOrSplit(down, hor, true);
+}
+function moveUp() {
+    moveOrSplit(up, hor, false);
+}
+function closeWindow() {
+    (global as any).app.commands.executeCommandById("workspace:close");
+}
+function quickSwitch() {
+    (global as any).app.commands.executeCommandById("switcher:open");
+}
+function focusEditor() {
+    (global as any).app.commands.executeCommandById("editor:focus");
+}
+function files() {
+    (global as any).app.commands.executeCommandById("file-explorer:reveal-active-file");
+}
+function graph() {
+    (global as any).app.commands.executeCommandById("graph:open");
+}
+function graphLocal() {
+    (global as any).app.commands.executeCommandById("graph:open-local");
+}
+
+export const WORKSPACE_PLUGIN_ID = 'workspaces';
+
+function getWorkspaces() {
+    let o = getInternalPluginById(this.app, WORKSPACE_PLUGIN_ID);
+    if (!o) {
+        console.log("no workspaces plugin");
+        return null;
+    }
+    if (!o.enabled) {
+        console.log("workspaces plugin not enabled");
+        return null;
+    }
+    return o.instance;
+}
+function getInternalPluginById(app: App, id: string) {
+  return (app as any).internalPlugins?.getPluginById(id);
+}
+
+function isNumeric(s: string) {
+    return /^\d+$/.test(s);
+}
+function numericWorkspaces(w:any) {
+    return Object.keys(w.workspaces).filter(isNumeric);
+}
+
+function withWorkspace(f:any) {
+    let w = getWorkspaces();
+    if (w) {
+        return f(w);
+    }
+}
+function seekWorkspace(w:any, off: number, is_deleting:boolean=false):string {
+    let old = w.activeWorkspace;
+    let candidates = numericWorkspaces(w);
+    if (candidates.length==0) {
+        return null;
+    }
+    let log_max = is_deleting?candidates.length-1:candidates.length;
+    if (!isNumeric(old)) {
+        new Notice("Default Tab " + 0 + "/" + log_max);
+        return candidates[0];
+    }
+    let old_idx = candidates.findIndex(s => s == old);
+    let new_idx = ((old_idx + off + candidates.length) % candidates.length);
+    new Notice("Tab " + (new_idx+1) + "/" + log_max);
+    return candidates[new_idx];
+}
+
+function loadWorkspaces(w:any, id:string) {
+    if (w.activeWorkspace) {
+        w.saveWorkspace(w.activeWorkspace);
+    }
+    w.loadWorkspace(id);
+    w.setActiveWorkspace(id);
+}
+function mkWorkspace(w:any) {
+    let c = numericWorkspaces(w);
+    let next = c.length? parseInt(c[c.length-1])+1: 1;
+    let count = c.length+1
+    if (w.activeWorkspace) {
+        w.saveWorkspace(w.activeWorkspace);
+    } else if (next == 1) {
+        w.saveWorkspace(""+next);
+        next = next + 1
+        count += 1 
+    }
+    new Notice("New Tab " + count + "/" + count);
+    w.saveWorkspace(""+next);
+    w.setActiveWorkspace(""+next);
+}
+function nextWorkspace(w:any) {
+    loadWorkspaces(w, seekWorkspace(w, 1))
+}
+function prevWorkspace(w:any) {
+    loadWorkspaces(w, seekWorkspace(w, -1))
+}
+function delWorkspace(w:any) {
+    let cur = w.activeWorkspace
+    let prev = seekWorkspace(w, -1, true)
+    if (prev != cur) {
+        loadWorkspaces(w, prev)
+    }
+    w.deleteWorkspace(cur)
 }
