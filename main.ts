@@ -32,16 +32,16 @@ export default class MyPlugin extends Plugin {
 
             this.codeMirrorVimObject = (window.CodeMirror as any).Vim;
             this.editorMode = 'cm5';
-            console.log('Vimrc plugin: using CodeMirror 5 mode');
+            console.log('Vim Spaces plugin: using CodeMirror 5 mode');
         } else {
             this.codeMirrorVimObject = (window as any).CodeMirrorAdapter?.Vim;
             this.editorMode = 'cm6';
-            console.log('Vimrc plugin: using CodeMirror 6 mode');
+            console.log('Vim Spaces plugin: using CodeMirror 6 mode');
         }
         if (!this.codeMirrorVimObject || this.codeMirrorVimObject.loadedSpaces) { return; }
         let cm = this.getCodeMirror(view);
         if (!cm) { return; }
-        console.log("Vimrc loading");
+        console.log("Vim Spaces loading");
         this.codeMirrorVimObject.unmap('<Space>');
         this.codeMirrorVimObject.loadedSpaces = true;
         this.mkMapping("moveleft", "<Space>h", moveLeft, cm);
@@ -50,7 +50,7 @@ export default class MyPlugin extends Plugin {
         this.mkMapping("movedown", "<Space>j", moveDown, cm);
         this.mkMapping("closewindow", "<Space>c", closeWindow, cm);
         this.mkMapping("findfiles", "<Space><Space>", quickSwitch, cm);
-        this.mkMapping("files", "", files, cm);
+        this.mkMapping("files", "-", files, cm);
         this.mkMapping("graph", "<Space>g", graph, cm);
         this.mkMapping("graphlocal", "<Space>f", graphLocal, cm);
         this.mkMapping("newworkspace", "<Space>q", () => withWorkspace(mkWorkspace), cm);

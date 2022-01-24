@@ -73,11 +73,11 @@ var MyPlugin = class extends import_obsidian.Plugin {
     if ((_a = this.app.vault.config) == null ? void 0 : _a.legacyEditor) {
       this.codeMirrorVimObject = window.CodeMirror.Vim;
       this.editorMode = "cm5";
-      console.log("Vimrc plugin: using CodeMirror 5 mode");
+      console.log("Vim Spaces plugin: using CodeMirror 5 mode");
     } else {
       this.codeMirrorVimObject = (_b = window.CodeMirrorAdapter) == null ? void 0 : _b.Vim;
       this.editorMode = "cm6";
-      console.log("Vimrc plugin: using CodeMirror 6 mode");
+      console.log("Vim Spaces plugin: using CodeMirror 6 mode");
     }
     if (!this.codeMirrorVimObject || this.codeMirrorVimObject.loadedSpaces) {
       return;
@@ -86,7 +86,7 @@ var MyPlugin = class extends import_obsidian.Plugin {
     if (!cm) {
       return;
     }
-    console.log("Vimrc loading");
+    console.log("Vim Spaces loading");
     this.codeMirrorVimObject.unmap("<Space>");
     this.codeMirrorVimObject.loadedSpaces = true;
     this.mkMapping("moveleft", "<Space>h", moveLeft, cm);
@@ -95,7 +95,7 @@ var MyPlugin = class extends import_obsidian.Plugin {
     this.mkMapping("movedown", "<Space>j", moveDown, cm);
     this.mkMapping("closewindow", "<Space>c", closeWindow, cm);
     this.mkMapping("findfiles", "<Space><Space>", quickSwitch, cm);
-    this.mkMapping("files", "", files, cm);
+    this.mkMapping("files", "-", files, cm);
     this.mkMapping("graph", "<Space>g", graph, cm);
     this.mkMapping("graphlocal", "<Space>f", graphLocal, cm);
     this.mkMapping("newworkspace", "<Space>q", () => withWorkspace(mkWorkspace), cm);
