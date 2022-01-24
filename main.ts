@@ -9,30 +9,72 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
+
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
+    codeMirrorVimObject: any;
+    editorMode: "cm5"|"cm6";
 
 	async onload() {
-        let cm = global.CodeMirror;
-        await this.loadSettings();
-        (cm as any).Vim.unmap('<Space>');
-        mkMapping("move-left", "<Space>h", moveLeft, cm);
-        mkMapping("move-right", "<Space>l", moveRight, cm);
-        mkMapping("move-up", "<Space>k", moveUp, cm);
-        mkMapping("move-down", "<Space>j", moveDown, cm);
-        mkMapping("close-window", "<Space>c", closeWindow, cm);
-        mkMapping("find-files", "<Space><Space>", quickSwitch, cm);
-        mkMapping("files", "-", files, cm);
-        mkMapping("graph", "<Space>g", graph, cm);
-        mkMapping("graph-local", "<Space>f", graphLocal, cm);
-        mkMapping("new-workspace", "<Space>q", () => withWorkspace(mkWorkspace), cm);
-        mkMapping("next-workspace", "<Space>o", () => withWorkspace(nextWorkspace), cm);
-        mkMapping("prev-workspace", "<Space>i", () =>withWorkspace(prevWorkspace), cm);
-        mkMapping("del-workspace", "<Space>Q", () => withWorkspace(delWorkspace), cm);
+		this.registerEvent(this.app.workspace.on('file-open', (_file: TFile) => {
+            let view = this.getActiveView();
+            this.doLoad(view);
+        }));
         // todo: map escape
         // - nohighlight
         // - return to editor window
 	}
+	private getActiveView(): MarkdownView {
+		return this.app.workspace.getActiveViewOfType(MarkdownView);
+	}
+    private doLoad(view: MarkdownView) {
+        if ((this.app.vault as any).config?.legacyEditor) {
+
+            this.codeMirrorVimObject = (window.CodeMirror as any).Vim;
+            this.editorMode = 'cm5';
+            console.log('Vimrc plugin: using CodeMirror 5 mode');
+        } else {
+            this.codeMirrorVimObject = (window as any).CodeMirrorAdapter?.Vim;
+            this.editorMode = 'cm6';
+            console.log('Vimrc plugin: using CodeMirror 6 mode');
+        }
+        if (!this.codeMirrorVimObject || this.codeMirrorVimObject.loadedSpaces) { return; }
+        let cm = this.getCodeMirror(view);
+        if (!cm) { return; }
+        console.log("Vimrc loading");
+        this.codeMirrorVimObject.unmap('<Space>');
+        this.codeMirrorVimObject.loadedSpaces = true;
+        this.mkMapping("moveleft", "<Space>h", moveLeft, cm);
+        this.mkMapping("moveright", "<Space>l", moveRight, cm);
+        this.mkMapping("moveup", "<Space>k", moveUp, cm);
+        this.mkMapping("movedown", "<Space>j", moveDown, cm);
+        this.mkMapping("closewindow", "<Space>c", closeWindow, cm);
+        this.mkMapping("findfiles", "<Space><Space>", quickSwitch, cm);
+        this.mkMapping("files", "", files, cm);
+        this.mkMapping("graph", "<Space>g", graph, cm);
+        this.mkMapping("graphlocal", "<Space>f", graphLocal, cm);
+        this.mkMapping("newworkspace", "<Space>q", () => withWorkspace(mkWorkspace), cm);
+        this.mkMapping("nextworkspace", "<Space>o", () => withWorkspace(nextWorkspace), cm);
+        this.mkMapping("prevworkspace", "<Space>i", () =>withWorkspace(prevWorkspace), cm);
+        this.mkMapping("delworkspace", "<Space>Q", () => withWorkspace(delWorkspace), cm);
+
+    }
+    private mkMapping(name: string, key: string, action:any, cm:any) {
+            // this.codeMirrorVimObject.defineEx(name, '', action);
+            // console.log(`nnoremap ${key} :${name}<cr>`);
+            // this.codeMirrorVimObject.handleEx(cm, `nnoremap ${key} :${name}<cr>`);
+            // this.codeMirrorVimObject.de(cm, `nnoremap ${key} :${name}<cr>`);
+            console.log(`defineEx(${name} ,"", ${action}`);
+            this.codeMirrorVimObject.defineEx(name, "", action);
+            this.codeMirrorVimObject.handleEx(cm, `nmap ${key} :${name}` );
+    }
+
+    private getCodeMirror(view: MarkdownView): CodeMirror.Editor {
+            if (this.editorMode == 'cm6')
+                {return (view as any).sourceMode?.cmEditor.cm.cm;} 
+            else
+                {return (view as any).sourceMode?.cmEditor;}
+        }
 
 	onunload() {
 
@@ -97,10 +139,6 @@ let right = "editor:focus-right"
 let up = "editor:focus-top"
 let down = "editor:focus-bottom"
 
-function mkMapping(name: string, key: string, action:any, cm:any) {
-    cm.Vim.defineAction(name, action);
-    cm.Vim.mapCommand(key, "action", name, {}, {"context": "normal", "isEdit": false});
-}
 
 function moveRight() {
     moveOrSplit(right, ver, true);
